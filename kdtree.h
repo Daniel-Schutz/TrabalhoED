@@ -1,22 +1,24 @@
 #ifndef KDTREE_H
 #define KDTREE_H
 
-typedef struct
+typedef struct _no
 {
-    double x;
-    double y;
-} Ponto;
+    void *item;
+    struct _no *esq;
+    struct _no *dir;
+    struct _no *pai;
+    int h; // altura do nó
+} tno;
 
-typedef struct NoKD
+typedef struct _arv
 {
-    Ponto *ponto;
-    void *data;
-    struct NoKD *esquerda;
-    struct NoKD *direita;
-} NoKD;
+    tno *raiz;
+    int (*compara)(const void *a, const void *b, int altura);
+} tarv;
 
-void inserirNo(NoKD **raiz, Ponto *ponto, void *data, int nivel);
-void encontrarVizinhos(NoKD *raiz, Ponto ponto, int k, double *distancias, Ponto *vizinhos, void **data);
-void destruirArvore(NoKD *raiz);
+tarv *criar_arvore(int (*compara)(const void *a, const void *b, int altura));
+void inserir_no(tarv *arvore, void *item);
+tno **encontrar_proximo(tarv *arv, void *item, int n);
+void deletar_arvore(tarv *arvore);
 
 #endif
