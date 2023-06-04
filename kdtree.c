@@ -105,44 +105,28 @@ tno *buscar_no(tarv *arvore, void *item)
     return ultimoVerificado;
 }
 
+void liberar_arvore(tno *no)
+{
+    if (no == NULL)
+    {
+        return;
+    }
+
+    liberar_arvore(no->esq); // liberar o filho esquerdo
+    liberar_arvore(no->dir); // liberar o filho direito
+
+    free(no); // liberar o nó atual
+}
+
 void deletar_arvore(tarv *arvore)
 {
     if (arvore == NULL)
-        return;
-
-    tno *atual = arvore->raiz;
-
-    while (atual != NULL)
     {
-        if (atual->esq == NULL)
-        {
-            tno *temp = atual->dir;
-            free(atual);
-            atual = temp;
-        }
-        else
-        {
-            tno *predecessor = atual->esq;
-
-            while (predecessor->dir != NULL && predecessor->dir != atual)
-            {
-                predecessor = predecessor->dir;
-            }
-
-            if (predecessor->dir == NULL)
-            {
-                predecessor->dir = atual;
-                atual = atual->esq;
-            }
-            else
-            {
-                predecessor->dir = NULL;
-                tno *temp = atual->dir;
-                free(atual);
-                atual = temp;
-            }
-        }
+        return;
     }
+
+    liberar_arvore(arvore->raiz);
+    arvore->raiz = NULL;
 
     free(arvore);
 }
