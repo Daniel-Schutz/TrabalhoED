@@ -3,135 +3,226 @@
 #include <math.h>
 #include "kdtree.h"
 
-/* Funções principais:
-   - Inserção: inserirNo
-   - Busca: encontrarVizinhos
-   - Destruição: destruirArvore
-*/
-
-// função auxiliar para a função encontrarVizinhos
-double calcularDistancia(Ponto *ponto1, Ponto *ponto2)
+tarv *criar_arvore(int (*compara)(const void *a, const void *b, int altura))
 {
-    double difX = ponto1->x - ponto2->x;
-    double difY = ponto1->y - ponto2->y;
-    return sqrt(difX * difX + difY * difY);
-}
-
-// função auxiliar para a função inserirNo
-NoKD *criarNo(Ponto *ponto, void *data)
-{
-    NoKD *no = (NoKD *)malloc(sizeof(NoKD));
-    no->ponto = ponto;
-    no->data = data;
-    no->esquerda = NULL;
-    no->direita = NULL;
-    return no;
-}
-
-void inserirNo(NoKD **raiz, Ponto *ponto, void *data, int nivel)
-{
-    if (*raiz == NULL)
+    tarv *nova_arvore = (tarv *)malloc(sizeof(tarv));
+    if (nova_arvore)
     {
-        *raiz = criarNo(ponto, data);
+        nova_arvore->raiz = NULL;
+        nova_arvore->compara = compara;
+    }
+    return nova_arvore;
+}
+
+tno *criar_no(void *item)
+{
+    tno *novo_no = (tno *)malloc(sizeof(tno));
+    if (novo_no)
+    {
+        novo_no->item = item;
+        novo_no->esq = NULL;
+        novo_no->dir = NULL;
+        novo_no->pai = NULL;
+        novo_no->h = 0; // altura do nó inicializada como 0
+    }
+    return novo_no;
+}
+
+void inserir_no(tarv *arvore, void *item)
+{
+    if (arvore == NULL || item == NULL)
+        return;
+
+    tno *novo_no = criar_no(item);
+    if (novo_no == NULL)
+        return;
+
+    if (arvore->raiz == NULL)
+    {
+        arvore->raiz = novo_no;
     }
     else
     {
-        int dimensaoAtual = nivel % 2;
-        if (ponto->x < (*raiz)->ponto->x)
+        tno *atual = arvore->raiz;
+        tno *pai;
+
+        while (1)
         {
-            inserirNo(&(*raiz)->esquerda, ponto, data, nivel + 1);
+            pai = atual;
+
+            if (arvore->compara(item, atual->item, atual->h) < 0)
+            {
+                atual = atual->esq;
+                if (atual == NULL)
+                {
+                    pai->esq = novo_no;
+                    novo_no->pai = pai;
+                    novo_no->h = pai->h + 1; // atualiza a altura do novo nó
+                    break;
+                }
+            }
+            else
+            {
+                atual = atual->dir;
+                if (atual == NULL)
+                {
+                    pai->dir = novo_no;
+                    novo_no->pai = pai;
+                    novo_no->h = pai->h + 1; // atualiza a altura do novo nó
+                    break;
+                }
+            }
+        }
+    }
+}
+
+tno *buscar_no(tarv *arvore, void *item)
+{
+    if (arvore == NULL || arvore->raiz == NULL || item == NULL)
+        return NULL;
+
+    tno *atual = arvore->raiz;
+    tno *ultimoVerificado = NULL;
+
+    while (atual != NULL)
+    {
+        if (arvore->compara(item, atual->item, atual->h) == 0)
+        {
+            return atual;
+        }
+        else if (arvore->compara(item, atual->item, atual->h) < 0)
+        {
+            ultimoVerificado = atual;
+            atual = atual->esq;
         }
         else
         {
-            inserirNo(&(*raiz)->direita, ponto, data, nivel + 1);
+            ultimoVerificado = atual;
+            atual = atual->dir;
         }
     }
+
+    return ultimoVerificado;
 }
 
-void encontrarVizinhos(NoKD *raiz, Ponto ponto, int k, double *distancias, Ponto *vizinhos, void **data)
+void deletar_arvore(tarv *arvore)
 {
-    if (raiz == NULL)
-    {
+    if (arvore == NULL)
         return;
-    }
 
-    double distancia = calcularDistancia(&ponto, raiz->ponto);
+    tno *atual = arvore->raiz;
 
-    int posicaoInsercao = -1;
-    for (int i = 0; i < k; i++)
+    while (atual != NULL)
     {
-        if (vizinhos[i].x == 0.0 && vizinhos[i].y == 0.0)
+        if (atual->esq == NULL)
         {
-            posicaoInsercao = i;
-            break;
+            tno *temp = atual->dir;
+            free(atual);
+            atual = temp;
         }
-    }
-
-    if (posicaoInsercao != -1)
-    {
-        // Verificar se o ponto é idêntico ao ponto de busca
-        if (calcularDistancia(&ponto, raiz->ponto) != 0.0)
+        else
         {
-            vizinhos[posicaoInsercao] = *raiz->ponto;
-            distancias[posicaoInsercao] = distancia;
-            data[posicaoInsercao] = raiz->data;
-        }
-    }
-    else
-    {
-        int indiceVizinhoMaisDistante = 0;
-        double distanciaVizinhoMaisDistante = distancias[0];
+            tno *predecessor = atual->esq;
 
-        for (int i = 1; i < k; i++)
-        {
-            if (distancias[i] > distanciaVizinhoMaisDistante)
+            while (predecessor->dir != NULL && predecessor->dir != atual)
             {
-                distanciaVizinhoMaisDistante = distancias[i];
-                indiceVizinhoMaisDistante = i;
+                predecessor = predecessor->dir;
+            }
+
+            if (predecessor->dir == NULL)
+            {
+                predecessor->dir = atual;
+                atual = atual->esq;
+            }
+            else
+            {
+                predecessor->dir = NULL;
+                tno *temp = atual->dir;
+                free(atual);
+                atual = temp;
             }
         }
-
-        if (distancia < distanciaVizinhoMaisDistante && calcularDistancia(&ponto, raiz->ponto) != 0.0)
-        {
-            vizinhos[indiceVizinhoMaisDistante] = *raiz->ponto;
-            distancias[indiceVizinhoMaisDistante] = distancia;
-            data[indiceVizinhoMaisDistante] = raiz->data;
-        }
     }
 
-    int dimensaoAtual = raiz->ponto->x < ponto.x ? 0 : 1;
-
-    if (dimensaoAtual == 0)
-    {
-        encontrarVizinhos(raiz->esquerda, ponto, k, distancias, vizinhos, data);
-        if (fabs(raiz->ponto->x - ponto.x) < distancias[0])
-        {
-            encontrarVizinhos(raiz->direita, ponto, k, distancias, vizinhos, data);
-        }
-    }
-    else
-    {
-        encontrarVizinhos(raiz->direita, ponto, k, distancias, vizinhos, data);
-        if (fabs(raiz->ponto->x - ponto.x) < distancias[0])
-        {
-            encontrarVizinhos(raiz->esquerda, ponto, k, distancias, vizinhos, data);
-        }
-    }
+    free(arvore);
 }
 
-void destruirArvore(NoKD *raiz)
+tno *sucessor_no(tno *no)
 {
-    if (raiz == NULL)
+    if (no->dir != NULL)
     {
-        return;
+        no = no->dir;
+        while (no->esq != NULL)
+            no = no->esq;
+        return no;
     }
 
-    destruirArvore(raiz->esquerda);
-    destruirArvore(raiz->direita);
-    free(raiz->ponto);
-    free(raiz);
+    tno *pai = no->pai;
+    while (pai != NULL && no == pai->dir)
+    {
+        no = pai;
+        pai = pai->pai;
+    }
 
-    raiz->esquerda = NULL; // Adição da atribuição NULL aos ponteiros
-    raiz->direita = NULL;  // esquerda e direita após a liberação da memória
+    return pai;
+}
+
+tno *predecessor_no(tno *no)
+{
+    if (no->esq != NULL)
+    {
+        no = no->esq;
+        while (no->dir != NULL)
+            no = no->dir;
+        return no;
+    }
+
+    tno *pai = no->pai;
+    while (pai != NULL && no == pai->esq)
+    {
+        no = pai;
+        pai = pai->pai;
+    }
+
+    return pai;
+}
+
+tno **encontrar_proximo(tarv *arv, void *item, int n)
+{
+    tno *noAlvo = buscar_no(arv, item);
+
+    if (noAlvo == NULL)
+    {
+        printf("No não encontrado na árvore.\n");
+        return NULL;
+    }
+
+    tno **vizinhos = (tno **)malloc((2 * n + 1) * sizeof(tno *));
+    tno *atual = noAlvo;
+    int count = 0;
+
+    vizinhos[count] = atual;
+    count++;
+
+    while (count < (2 * n + 1) && atual != NULL)
+    {
+        tno *predecessor = predecessor_no(atual);
+        if (predecessor != NULL)
+        {
+            vizinhos[count] = predecessor;
+            count++;
+        }
+
+        tno *sucessor = sucessor_no(atual);
+        if (sucessor != NULL)
+        {
+            vizinhos[count] = sucessor;
+            count++;
+        }
+
+        atual = atual->pai;
+    }
+
+    return vizinhos;
 }
 
